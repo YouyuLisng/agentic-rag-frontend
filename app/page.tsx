@@ -209,9 +209,14 @@ export default function Home() {
             <header className="flex flex-col gap-3 border-b py-4">
                 <div className="flex items-center justify-between">
                     <h1 className="text-lg font-semibold">Agentic RAG 旅遊助理</h1>
-                    <Link href="/data" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-                        查看資料庫原始資料 →
-                    </Link>
+                    <div className="flex gap-3 text-sm text-muted-foreground">
+                        <Link href="/eval" className="underline-offset-4 hover:underline">
+                            RAG 檢索評估 →
+                        </Link>
+                        <Link href="/data" className="underline-offset-4 hover:underline">
+                            查看資料庫原始資料 →
+                        </Link>
+                    </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
                     模型自主判斷該查政策知識庫還是行程資料庫,過程即時可見。
