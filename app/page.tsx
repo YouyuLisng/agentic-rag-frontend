@@ -9,7 +9,13 @@ import type { ConversationTurn } from "@/components/chat/tool-step";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { streamChat, type AgentEvent } from "@/lib/chat";
+import { streamChat, type AgentEvent, type AgentImpl } from "@/lib/chat";
+import { cn } from "@/lib/utils";
+
+const IMPL_LABELS: Record<AgentImpl, string> = {
+    handrolled: "手刻版",
+    langchain: "LangChain 版",
+};
 
 const SUGGESTIONS = [
     "找適合長輩、預算兩萬內的行程,第一個那團的詳細行程是什麼?",
@@ -73,6 +79,7 @@ export default function Home() {
     const [turns, setTurns] = useState<ConversationTurn[]>([]);
     const [input, setInput] = useState("");
     const [isStreaming, setIsStreaming] = useState(false);
+    const [impl, setImpl] = useState<AgentImpl>("handrolled");
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -87,14 +94,14 @@ export default function Home() {
         setTurns((prev) => [
             ...prev,
             { role: "user", text: message },
-            { role: "assistant", steps: [], pending: true },
+            { role: "assistant", steps: [], pending: true, impl },
         ]);
         setInput("");
         setIsStreaming(true);
         scrollToBottom();
 
         try {
-            await streamChat(message, (event) => {
+            await streamChat(message, impl, (event) => {
                 // Must be a pure function of prev -- React (Strict Mode, in
                 // dev) double-invokes state updaters to catch impure ones.
                 // An earlier version mutated `last` in place, which meant
@@ -114,11 +121,25 @@ export default function Home() {
 
     return (
         <div className="mx-auto flex h-dvh w-full max-w-3xl flex-col px-4">
-            <header className="flex flex-col gap-1 border-b py-4">
+            <header className="flex flex-col gap-2 border-b py-4">
                 <h1 className="text-lg font-semibold">Agentic RAG 旅遊助理</h1>
                 <p className="text-sm text-muted-foreground">
-                    手刻多步 agentic loop -- 模型自主判斷該查政策知識庫還是行程資料庫,過程即時可見。
+                    模型自主判斷該查政策知識庫還是行程資料庫,過程即時可見。
                 </p>
+                <div className="flex gap-1 rounded-lg border p-1 text-sm">
+                    {(Object.keys(IMPL_LABELS) as AgentImpl[]).map((key) => (
+                        <button
+                            key={key}
+                            onClick={() => setImpl(key)}
+                            className={cn(
+                                "flex-1 rounded-md px-3 py-1.5 transition-colors",
+                                impl === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
+                            )}
+                        >
+                            {IMPL_LABELS[key]}
+                        </button>
+                    ))}
+                </div>
             </header>
 
             <ScrollArea className="flex-1 py-4">
@@ -145,6 +166,11 @@ export default function Home() {
                             </div>
                         ) : (
                             <div key={i} className="max-w-[90%] rounded-2xl border bg-card px-4 py-3">
+                                {turn.impl && (
+                                    <div className="mb-2 text-xs font-medium text-muted-foreground">
+                                        {IMPL_LABELS[turn.impl]}
+                                    </div>
+                                )}
                                 {turn.steps && turn.steps.length > 0 && <ToolStepTimeline steps={turn.steps} />}
                                 {turn.text ? (
                                     <Markdown>{turn.text}</Markdown>

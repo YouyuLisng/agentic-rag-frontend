@@ -6,6 +6,8 @@ export type AgentEvent =
     | { type: "max_turns_exceeded"; text: string }
     | { type: "error"; message: string };
 
+export type AgentImpl = "handrolled" | "langchain";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 // Hand-rolled SSE parsing over a plain fetch stream, not EventSource --
@@ -14,13 +16,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 // text tokens.
 export async function streamChat(
     message: string,
+    impl: AgentImpl,
     onEvent: (event: AgentEvent) => void,
     signal?: AbortSignal
 ): Promise<void> {
     const res = await fetch(`${API_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, impl }),
         signal,
     });
 

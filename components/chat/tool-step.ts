@@ -12,4 +12,5 @@ export interface ConversationTurn {
     text?: string;
     steps?: ToolStep[];
     pending?: boolean;
+    impl?: "handrolled" | "langchain";
 }
