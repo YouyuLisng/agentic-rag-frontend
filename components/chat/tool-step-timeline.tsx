@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, CalendarCheck, CheckCircle2, Compass, FileText, Loader2, XCircle } from "lucide-react";
+import { BookOpen, CalendarCheck, CheckCircle2, Compass, FileSearch, FileText, Loader2, XCircle } from "lucide-react";
 
 import { MODEL_LABELS, TOOL_LABELS } from "@/lib/chat";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ const TOOL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
     search_tours: Compass,
     get_tour_detail: FileText,
     check_availability: CalendarCheck,
+    search_document: FileSearch,
 };
 
 function formatInput(input: Record<string, unknown>): string {

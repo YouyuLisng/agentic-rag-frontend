@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Paperclip, Send, X } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { Markdown } from "@/components/chat/markdown";
@@ -10,8 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
-import { MODEL_LABELS, streamChat, type AgentEvent, type AgentImpl } from "@/lib/chat";
+import {
+    MODEL_LABELS,
+    streamChat,
+    uploadDocument,
+    type AgentEvent,
+    type AgentImpl,
+    type UploadedDocument,
+} from "@/lib/chat";
 import { cn } from "@/lib/utils";
+
+const ACCEPTED_FILE_TYPES = ".pdf,.docx,.jpg,.jpeg,.png";
 
 const IMPL_LABELS: Record<AgentImpl, string> = {
     handrolled: "手刻版",
@@ -126,13 +135,30 @@ export default function Home() {
     const [isStreaming, setIsStreaming] = useState(false);
     const [impl, setImpl] = useState<AgentImpl>("handrolled");
     const [compareMode, setCompareMode] = useState(false);
+    const [uploadedDoc, setUploadedDoc] = useState<UploadedDocument | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const scrollToBottom = () => {
         requestAnimationFrame(() => {
             scrollRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
         });
     };
+
+    async function handleFileSelect(file: File) {
+        setIsUploading(true);
+        setUploadError(null);
+        try {
+            const doc = await uploadDocument(file);
+            setUploadedDoc(doc);
+        } catch (e) {
+            setUploadError(e instanceof Error ? e.message : String(e));
+        } finally {
+            setIsUploading(false);
+        }
+    }
 
     function runOne(message: string, whichImpl: AgentImpl, setTurns: typeof setHandrolledTurns) {
         setTurns((prev) => [
@@ -141,7 +167,7 @@ export default function Home() {
             { role: "assistant", steps: [], pending: true, impl: whichImpl },
         ]);
 
-        return streamChat(message, whichImpl, (event) => {
+        return streamChat(message, whichImpl, uploadedDoc?.document_id ?? null, (event) => {
             setTurns((prev) => updateLastAssistantTurn(prev, event));
             scrollToBottom();
         }).catch((e) => {
@@ -207,6 +233,23 @@ export default function Home() {
                         同時比較兩版(雙倍 API 用量)
                     </label>
                 </div>
+
+                {uploadedDoc && (
+                    <div className="flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-sm">
+                        <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="flex-1 truncate">
+                            {uploadedDoc.filename}({uploadedDoc.chunk_count} 個片段)-- 模式 B 已啟用,可以詢問文件內容
+                        </span>
+                        <button
+                            onClick={() => setUploadedDoc(null)}
+                            className="text-muted-foreground hover:text-foreground"
+                            aria-label="移除文件"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                )}
+                {uploadError && <div className="text-sm text-destructive">上傳失敗:{uploadError}</div>}
             </header>
 
             <ScrollArea className="flex-1 py-4">
@@ -249,6 +292,26 @@ export default function Home() {
                 }}
                 className="flex gap-2 border-t py-4"
             >
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={ACCEPTED_FILE_TYPES}
+                    className="hidden"
+                    onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileSelect(file);
+                        e.target.value = "";
+                    }}
+                />
+                <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isUploading || isStreaming}
+                    onClick={() => fileInputRef.current?.click()}
+                    title="上傳文件(PDF/Word/圖片)-- 模式 B"
+                >
+                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                </Button>
                 <Input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
