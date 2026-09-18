@@ -5,6 +5,7 @@ export interface ToolStep {
     input: Record<string, unknown>;
     status: "running" | "done" | "error";
     result?: string;
+    model: string;
 }
 
 export interface ConversationTurn {
@@ -13,4 +14,5 @@ export interface ConversationTurn {
     steps?: ToolStep[];
     pending?: boolean;
     impl?: "handrolled" | "langchain";
+    answerModel?: string;
 }

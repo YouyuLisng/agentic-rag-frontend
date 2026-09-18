@@ -1,7 +1,14 @@
 export type AgentEvent =
-    | { type: "tool_call"; turn: number; tool_use_id: string; name: string; input: Record<string, unknown> }
+    | {
+          type: "tool_call";
+          turn: number;
+          tool_use_id: string;
+          name: string;
+          input: Record<string, unknown>;
+          model: string;
+      }
     | { type: "tool_result"; turn: number; tool_use_id: string; name: string; result: string; is_error: boolean }
-    | { type: "final_answer"; text: string }
+    | { type: "final_answer"; text: string; model: string }
     | { type: "refusal"; category: string | null; explanation: string | null }
     | { type: "max_turns_exceeded"; text: string }
     | { type: "error"; message: string };
@@ -60,4 +67,13 @@ export const TOOL_LABELS: Record<string, string> = {
     search_knowledge: "查詢政策知識庫",
     search_tours: "搜尋行程",
     get_tour_detail: "查詢行程詳情",
+    check_availability: "查詢即時名額",
+};
+
+// Model routing: tool-selection decisions always run on the fast model;
+// the final answer escalates to the smart model only when a tool was
+// actually used this conversation.
+export const MODEL_LABELS: Record<string, string> = {
+    "claude-haiku-4-5": "Haiku(快速判斷)",
+    "claude-sonnet-5": "Sonnet(綜合統整)",
 };

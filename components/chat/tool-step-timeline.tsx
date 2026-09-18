@@ -1,8 +1,8 @@
 "use client";
 
-import { BookOpen, CheckCircle2, Compass, FileText, Loader2, XCircle } from "lucide-react";
+import { BookOpen, CalendarCheck, CheckCircle2, Compass, FileText, Loader2, XCircle } from "lucide-react";
 
-import { TOOL_LABELS } from "@/lib/chat";
+import { MODEL_LABELS, TOOL_LABELS } from "@/lib/chat";
 import { cn } from "@/lib/utils";
 
 import type { ToolStep } from "./tool-step";
@@ -11,6 +11,7 @@ const TOOL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
     search_knowledge: BookOpen,
     search_tours: Compass,
     get_tour_detail: FileText,
+    check_availability: CalendarCheck,
 };
 
 function formatInput(input: Record<string, unknown>): string {
@@ -52,6 +53,9 @@ export function ToolStepTimeline({ steps }: { steps: ToolStep[] }) {
                                 )}
                                 {step.status === "done" && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
                                 {step.status === "error" && <XCircle className="h-3.5 w-3.5 text-red-500" />}
+                                <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+                                    {MODEL_LABELS[step.model] ?? step.model}
+                                </span>
                             </div>
                             {inputText && <div className="truncate text-xs text-muted-foreground">{inputText}</div>}
                         </div>

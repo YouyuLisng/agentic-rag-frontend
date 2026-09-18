@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
-import { streamChat, type AgentEvent, type AgentImpl } from "@/lib/chat";
+import { MODEL_LABELS, streamChat, type AgentEvent, type AgentImpl } from "@/lib/chat";
 import { cn } from "@/lib/utils";
 
 const IMPL_LABELS: Record<AgentImpl, string> = {
@@ -47,6 +47,7 @@ function updateLastAssistantTurn(prev: ConversationTurn[], event: AgentEvent): C
                         name: event.name,
                         input: event.input,
                         status: "running",
+                        model: event.model,
                     },
                 ],
             };
@@ -62,7 +63,7 @@ function updateLastAssistantTurn(prev: ConversationTurn[], event: AgentEvent): C
             };
             break;
         case "final_answer":
-            updated = { ...last, text: event.text, pending: false };
+            updated = { ...last, text: event.text, pending: false, answerModel: event.model };
             break;
         case "refusal":
             updated = { ...last, text: `很抱歉,這個問題我無法回答。${event.explanation ?? ""}`, pending: false };
@@ -95,7 +96,14 @@ function ConversationList({ turns }: { turns: ConversationTurn[] }) {
                     <div key={i} className="max-w-[90%] rounded-2xl border bg-card px-4 py-3">
                         {turn.steps && turn.steps.length > 0 && <ToolStepTimeline steps={turn.steps} />}
                         {turn.text ? (
-                            <Markdown>{turn.text}</Markdown>
+                            <>
+                                {turn.answerModel && (
+                                    <div className="mb-1 text-[10px] font-medium text-muted-foreground">
+                                        {MODEL_LABELS[turn.answerModel] ?? turn.answerModel} 撰寫最終回答
+                                    </div>
+                                )}
+                                <Markdown>{turn.text}</Markdown>
+                            </>
                         ) : (
                             turn.pending && (
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
