@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2, Paperclip, Send, X } from "lucide-react";
+import Link from "next/link";
 import { useRef, useState } from "react";
 
 import { Markdown } from "@/components/chat/markdown";
@@ -206,7 +207,12 @@ export default function Home() {
     return (
         <div className={cn("mx-auto flex h-dvh w-full flex-col px-4", compareMode ? "max-w-6xl" : "max-w-3xl")}>
             <header className="flex flex-col gap-3 border-b py-4">
-                <h1 className="text-lg font-semibold">Agentic RAG 旅遊助理</h1>
+                <div className="flex items-center justify-between">
+                    <h1 className="text-lg font-semibold">Agentic RAG 旅遊助理</h1>
+                    <Link href="/data" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+                        查看資料庫原始資料 →
+                    </Link>
+                </div>
                 <p className="text-sm text-muted-foreground">
                     模型自主判斷該查政策知識庫還是行程資料庫,過程即時可見。
                 </p>
