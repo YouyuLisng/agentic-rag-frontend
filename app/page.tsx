@@ -9,6 +9,7 @@ import type { ConversationTurn } from "@/components/chat/tool-step";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import { streamChat, type AgentEvent, type AgentImpl } from "@/lib/chat";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,10 @@ const SUGGESTIONS = [
 ];
 
 // Pure: returns a new array, never mutates `prev` or any turn inside it.
+// React (Strict Mode, in dev) double-invokes state updaters to catch
+// impure ones -- an earlier version mutated `last` in place, which meant
+// the throwaway first invocation's mutation was still visible to the
+// second, real invocation, so every step got appended twice.
 function updateLastAssistantTurn(prev: ConversationTurn[], event: AgentEvent): ConversationTurn[] {
     const lastIdx = prev.length - 1;
     const last = prev[lastIdx];
@@ -75,11 +80,44 @@ function updateLastAssistantTurn(prev: ConversationTurn[], event: AgentEvent): C
     return next;
 }
 
+function ConversationList({ turns }: { turns: ConversationTurn[] }) {
+    return (
+        <div className="flex flex-col gap-4">
+            {turns.map((turn, i) =>
+                turn.role === "user" ? (
+                    <div
+                        key={i}
+                        className="ml-auto max-w-[80%] rounded-2xl bg-primary px-4 py-2 text-sm text-primary-foreground"
+                    >
+                        {turn.text}
+                    </div>
+                ) : (
+                    <div key={i} className="max-w-[90%] rounded-2xl border bg-card px-4 py-3">
+                        {turn.steps && turn.steps.length > 0 && <ToolStepTimeline steps={turn.steps} />}
+                        {turn.text ? (
+                            <Markdown>{turn.text}</Markdown>
+                        ) : (
+                            turn.pending && (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    思考中...
+                                </div>
+                            )
+                        )}
+                    </div>
+                )
+            )}
+        </div>
+    );
+}
+
 export default function Home() {
-    const [turns, setTurns] = useState<ConversationTurn[]>([]);
+    const [handrolledTurns, setHandrolledTurns] = useState<ConversationTurn[]>([]);
+    const [langchainTurns, setLangchainTurns] = useState<ConversationTurn[]>([]);
     const [input, setInput] = useState("");
     const [isStreaming, setIsStreaming] = useState(false);
     const [impl, setImpl] = useState<AgentImpl>("handrolled");
+    const [compareMode, setCompareMode] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -88,62 +126,83 @@ export default function Home() {
         });
     };
 
-    async function send(message: string) {
-        if (!message.trim() || isStreaming) return;
-
+    function runOne(message: string, whichImpl: AgentImpl, setTurns: typeof setHandrolledTurns) {
         setTurns((prev) => [
             ...prev,
             { role: "user", text: message },
-            { role: "assistant", steps: [], pending: true, impl },
+            { role: "assistant", steps: [], pending: true, impl: whichImpl },
         ]);
+
+        return streamChat(message, whichImpl, (event) => {
+            setTurns((prev) => updateLastAssistantTurn(prev, event));
+            scrollToBottom();
+        }).catch((e) => {
+            const errText = e instanceof Error ? e.message : String(e);
+            setTurns((prev) => updateLastAssistantTurn(prev, { type: "error", message: errText }));
+        });
+    }
+
+    async function send(message: string) {
+        if (!message.trim() || isStreaming) return;
         setInput("");
         setIsStreaming(true);
         scrollToBottom();
 
+        // In compare mode, one question fires to both implementations at
+        // once -- that's the whole point (seeing the difference without
+        // having to re-ask). Otherwise it goes to whichever impl is
+        // selected.
+        const tasks: Promise<void>[] = [];
+        if (compareMode || impl === "handrolled") {
+            tasks.push(runOne(message, "handrolled", setHandrolledTurns));
+        }
+        if (compareMode || impl === "langchain") {
+            tasks.push(runOne(message, "langchain", setLangchainTurns));
+        }
+
         try {
-            await streamChat(message, impl, (event) => {
-                // Must be a pure function of prev -- React (Strict Mode, in
-                // dev) double-invokes state updaters to catch impure ones.
-                // An earlier version mutated `last` in place, which meant
-                // the throwaway first invocation's mutation was still
-                // visible to the second, real invocation -- every step got
-                // appended twice. Always derive a new object instead.
-                setTurns((prev) => updateLastAssistantTurn(prev, event));
-                scrollToBottom();
-            });
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e);
-            setTurns((prev) => updateLastAssistantTurn(prev, { type: "error", message }));
+            await Promise.all(tasks);
         } finally {
             setIsStreaming(false);
         }
     }
 
+    const hasStarted = handrolledTurns.length > 0 || langchainTurns.length > 0;
+
     return (
-        <div className="mx-auto flex h-dvh w-full max-w-3xl flex-col px-4">
-            <header className="flex flex-col gap-2 border-b py-4">
+        <div className={cn("mx-auto flex h-dvh w-full flex-col px-4", compareMode ? "max-w-6xl" : "max-w-3xl")}>
+            <header className="flex flex-col gap-3 border-b py-4">
                 <h1 className="text-lg font-semibold">Agentic RAG 旅遊助理</h1>
                 <p className="text-sm text-muted-foreground">
                     模型自主判斷該查政策知識庫還是行程資料庫,過程即時可見。
                 </p>
-                <div className="flex gap-1 rounded-lg border p-1 text-sm">
-                    {(Object.keys(IMPL_LABELS) as AgentImpl[]).map((key) => (
-                        <button
-                            key={key}
-                            onClick={() => setImpl(key)}
-                            className={cn(
-                                "flex-1 rounded-md px-3 py-1.5 transition-colors",
-                                impl === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
-                            )}
-                        >
-                            {IMPL_LABELS[key]}
-                        </button>
-                    ))}
+                <div className="flex items-center gap-4">
+                    <div className={cn("flex flex-1 gap-1 rounded-lg border p-1 text-sm", compareMode && "opacity-50")}>
+                        {(Object.keys(IMPL_LABELS) as AgentImpl[]).map((key) => (
+                            <button
+                                key={key}
+                                onClick={() => setImpl(key)}
+                                disabled={compareMode}
+                                className={cn(
+                                    "flex-1 rounded-md px-3 py-1.5 transition-colors",
+                                    !compareMode && impl === key
+                                        ? "bg-primary text-primary-foreground"
+                                        : "text-muted-foreground hover:bg-accent"
+                                )}
+                            >
+                                {IMPL_LABELS[key]}
+                            </button>
+                        ))}
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Switch checked={compareMode} onCheckedChange={setCompareMode} />
+                        同時比較兩版(雙倍 API 用量)
+                    </label>
                 </div>
             </header>
 
             <ScrollArea className="flex-1 py-4">
-                {turns.length === 0 && (
+                {!hasStarted && (
                     <div className="flex flex-col gap-2 pt-8">
                         <p className="text-sm text-muted-foreground">試試看:</p>
                         {SUGGESTIONS.map((s) => (
@@ -158,34 +217,20 @@ export default function Home() {
                     </div>
                 )}
 
-                <div className="flex flex-col gap-4">
-                    {turns.map((turn, i) =>
-                        turn.role === "user" ? (
-                            <div key={i} className="ml-auto max-w-[80%] rounded-2xl bg-primary px-4 py-2 text-sm text-primary-foreground">
-                                {turn.text}
-                            </div>
-                        ) : (
-                            <div key={i} className="max-w-[90%] rounded-2xl border bg-card px-4 py-3">
-                                {turn.impl && (
-                                    <div className="mb-2 text-xs font-medium text-muted-foreground">
-                                        {IMPL_LABELS[turn.impl]}
-                                    </div>
-                                )}
-                                {turn.steps && turn.steps.length > 0 && <ToolStepTimeline steps={turn.steps} />}
-                                {turn.text ? (
-                                    <Markdown>{turn.text}</Markdown>
-                                ) : (
-                                    turn.pending && (
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                            思考中...
-                                        </div>
-                                    )
-                                )}
-                            </div>
-                        )
-                    )}
-                </div>
+                {compareMode ? (
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <div className="mb-2 text-xs font-semibold text-muted-foreground">手刻版</div>
+                            <ConversationList turns={handrolledTurns} />
+                        </div>
+                        <div>
+                            <div className="mb-2 text-xs font-semibold text-muted-foreground">LangChain 版</div>
+                            <ConversationList turns={langchainTurns} />
+                        </div>
+                    </div>
+                ) : (
+                    <ConversationList turns={impl === "handrolled" ? handrolledTurns : langchainTurns} />
+                )}
                 <div ref={scrollRef} />
             </ScrollArea>
 
