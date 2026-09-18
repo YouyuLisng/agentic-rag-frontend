@@ -112,7 +112,7 @@ export default function EvalPage() {
                                             <TableCell>
                                                 <RankIcon rank={c.rank} />
                                             </TableCell>
-                                            <TableCell className="text-sm">{c.query}</TableCell>
+                                            <TableCell className="max-w-[240px] text-sm whitespace-normal">{c.query}</TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
                                                 {c.expected_slug}
                                             </TableCell>

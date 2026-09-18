@@ -64,7 +64,7 @@ export default function DataPage() {
                             {tours.map((tour) => (
                                 <Card key={tour.id}>
                                     <CardHeader>
-                                        <CardTitle className="flex items-center justify-between text-base">
+                                        <CardTitle className="flex flex-wrap items-center justify-between gap-1 text-base">
                                             {tour.title}
                                             <span
                                                 className={cn(

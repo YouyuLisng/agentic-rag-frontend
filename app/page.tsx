@@ -207,7 +207,7 @@ export default function Home() {
     return (
         <div className={cn("mx-auto flex h-dvh w-full flex-col px-4", compareMode ? "max-w-6xl" : "max-w-3xl")}>
             <header className="flex flex-col gap-3 border-b py-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                     <h1 className="text-lg font-semibold">Agentic RAG 旅遊助理</h1>
                     <div className="flex gap-3 text-sm text-muted-foreground">
                         <Link href="/eval" className="underline-offset-4 hover:underline">
@@ -221,7 +221,7 @@ export default function Home() {
                 <p className="text-sm text-muted-foreground">
                     模型自主判斷該查政策知識庫還是行程資料庫,過程即時可見。
                 </p>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                     <div className={cn("flex flex-1 gap-1 rounded-lg border p-1 text-sm", compareMode && "opacity-50")}>
                         {(Object.keys(IMPL_LABELS) as AgentImpl[]).map((key) => (
                             <button
@@ -280,7 +280,7 @@ export default function Home() {
                 )}
 
                 {compareMode ? (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4">
                         <div>
                             <div className="mb-2 text-xs font-semibold text-muted-foreground">手刻版</div>
                             <ConversationList turns={handrolledTurns} />
