@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Markdown } from "@/components/chat/markdown";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -60,6 +61,17 @@ export default function DataPage() {
                     </TabsList>
 
                     <TabsContent value="tours">
+                        <Alert className="mt-4">
+                            <ShieldCheck />
+                            <AlertTitle>底價 / 內部成本資料隔離</AlertTitle>
+                            <AlertDescription>
+                                資料庫裡每個行程其實還有一個 <code>cost_price_twd</code>(內部底價)欄位,但這個頁面、
+                                以及聊天機器人的所有工具回傳結果,都刻意不會包含這個欄位 --
+                                這是資料層的設計,不是遺漏或前端過濾。聊天視窗本身在架構上就沒有管道查到這筆資料,
+                                不管怎麼問(包含估算、反推、prompt injection)都一樣,已用真實對抗性測試驗證過
+                                (後端 <code>app/scripts/security_probe.py</code>)。
+                            </AlertDescription>
+                        </Alert>
                         <div className="flex flex-col gap-4 pt-4">
                             {tours.map((tour) => (
                                 <Card key={tour.id}>
