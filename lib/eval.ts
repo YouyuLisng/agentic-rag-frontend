@@ -26,3 +26,36 @@ export async function fetchRetrievalEval(): Promise<EvalReport> {
     if (!res.ok) throw new Error(`Failed to fetch eval report: ${res.status}`);
     return res.json();
 }
+
+export interface ClaimVerdict {
+    claim: string;
+    supported: boolean;
+}
+
+export interface GenerationEvalCase {
+    query: string;
+    answer: string;
+    context: string[];
+    faithfulness: number;
+    faithfulness_claims: ClaimVerdict[];
+    answer_relevancy: number;
+    relevancy_questions: string[];
+    is_noncommittal: boolean;
+}
+
+export interface GenerationEvalMetrics {
+    n: number;
+    avg_faithfulness: number;
+    avg_answer_relevancy: number;
+}
+
+export interface GenerationEvalReport {
+    metrics: GenerationEvalMetrics;
+    cases: GenerationEvalCase[];
+}
+
+export async function fetchGenerationEval(): Promise<GenerationEvalReport> {
+    const res = await fetch(`${API_URL}/eval/generation`);
+    if (!res.ok) throw new Error(`Failed to fetch generation eval report: ${res.status}`);
+    return res.json();
+}

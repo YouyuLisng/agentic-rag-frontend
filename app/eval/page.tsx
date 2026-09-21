@@ -4,10 +4,11 @@ import { ArrowLeft, CheckCircle2, Loader2, RotateCcw, TriangleAlert, XCircle } f
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { fetchRetrievalEval, type EvalReport } from "@/lib/eval";
+import { fetchGenerationEval, fetchRetrievalEval, type EvalReport, type GenerationEvalReport } from "@/lib/eval";
 import { cn } from "@/lib/utils";
 
 function MetricCard({ label, value }: { label: string; value: string }) {
@@ -30,10 +31,41 @@ function RankIcon({ rank }: { rank: number | null }) {
 // search_knowledge's retrieval quality, measured against a hand-labeled
 // eval set (16 paraphrased queries, 2 per policy document) -- not just
 // "it seemed to work when I tried it a few times."
+function ScoreBadge({ score, goodAt, okAt }: { score: number; goodAt: number; okAt: number }) {
+    return (
+        <span
+            className={cn(
+                "rounded-full px-2 py-0.5 text-xs font-medium",
+                score >= goodAt && "bg-emerald-100 text-emerald-700",
+                score >= okAt && score < goodAt && "bg-amber-100 text-amber-700",
+                score < okAt && "bg-red-100 text-red-700"
+            )}
+        >
+            {score.toFixed(2)}
+        </span>
+    );
+}
+
 export default function EvalPage() {
     const [report, setReport] = useState<EvalReport | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const [genReport, setGenReport] = useState<GenerationEvalReport | null>(null);
+    const [genLoading, setGenLoading] = useState(false);
+    const [genError, setGenError] = useState<string | null>(null);
+
+    // Only ever called from the button's onClick, never from an effect --
+    // unlike retrieval eval, generation eval is far more expensive (a full
+    // agent turn plus two judge calls per case) so it must not auto-run.
+    const runGenerationEval = useCallback(() => {
+        setGenLoading(true);
+        setGenError(null);
+        fetchGenerationEval()
+            .then(setGenReport)
+            .catch((e) => setGenError(e instanceof Error ? e.message : String(e)))
+            .finally(() => setGenLoading(false));
+    }, []);
 
     // Pure fetch, no upfront setState -- safe to call directly from the
     // mount effect. The initial `loading`/`error` state is already
@@ -136,6 +168,117 @@ export default function EvalPage() {
                     </Card>
                 </>
             )}
+
+            <div className="mt-10 border-t pt-6">
+                <div className="mb-1 flex items-center justify-between">
+                    <h2 className="text-base font-semibold">生成品質評估(Ragas 風格 LLM-as-a-Judge)</h2>
+                    <Button variant="outline" size="sm" onClick={runGenerationEval} disabled={genLoading}>
+                        {genLoading ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                            <RotateCcw className="h-3.5 w-3.5" />
+                        )}
+                        {genReport ? "重新評估" : "開始評估"}
+                    </Button>
+                </div>
+                <p className="mb-4 text-sm text-muted-foreground">
+                    8 題會實際跑一次完整 agent 對話,再用 Haiku 當裁判評分:Faithfulness 檢查回答有沒有幻覺(是否忠實於
+                    檢索到的資料),Answer Relevancy 檢查回答是否真的切題(把答案反推回問題,再用 embedding 比對語意相似度)。
+                    這裡會產生真實 API 費用,不會自動執行,需手動觸發。
+                </p>
+
+                {genError && <div className="mb-4 text-sm text-destructive">評估失敗:{genError}</div>}
+
+                {genLoading && !genReport && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> 評估中(8 題,每題都要跑完整對話 + 裁判評分)...
+                    </div>
+                )}
+
+                {genReport && (
+                    <>
+                        <div className="mb-6 grid grid-cols-2 gap-3">
+                            <MetricCard
+                                label="平均 Faithfulness"
+                                value={genReport.metrics.avg_faithfulness.toFixed(3)}
+                            />
+                            <MetricCard
+                                label="平均 Answer Relevancy"
+                                value={genReport.metrics.avg_answer_relevancy.toFixed(3)}
+                            />
+                        </div>
+
+                        <Card>
+                            <CardContent className="pt-6">
+                                <Accordion>
+                                    {genReport.cases.map((c, i) => (
+                                        <AccordionItem key={i} value={`case-${i}`}>
+                                            <AccordionTrigger>
+                                                <div className="flex flex-1 flex-wrap items-center justify-between gap-2 pr-2">
+                                                    <span className="text-sm">{c.query}</span>
+                                                    <div className="flex shrink-0 gap-2">
+                                                        <ScoreBadge score={c.faithfulness} goodAt={1} okAt={0.5} />
+                                                        <ScoreBadge score={c.answer_relevancy} goodAt={0.7} okAt={0.4} />
+                                                    </div>
+                                                </div>
+                                            </AccordionTrigger>
+                                            <AccordionContent>
+                                                <div className="flex flex-col gap-3">
+                                                    <div>
+                                                        <div className="mb-1 text-xs font-medium text-muted-foreground">
+                                                            回答
+                                                        </div>
+                                                        <p className="text-sm text-muted-foreground">{c.answer}</p>
+                                                    </div>
+
+                                                    {c.faithfulness_claims.length > 0 && (
+                                                        <div>
+                                                            <div className="mb-1 text-xs font-medium text-muted-foreground">
+                                                                事實陳述查核({c.faithfulness_claims.length} 條)
+                                                            </div>
+                                                            <ul className="flex flex-col gap-1">
+                                                                {c.faithfulness_claims.map((claim, j) => (
+                                                                    <li key={j} className="flex items-start gap-1.5 text-xs">
+                                                                        {claim.supported ? (
+                                                                            <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+                                                                        ) : (
+                                                                            <XCircle className="mt-0.5 h-3 w-3 shrink-0 text-destructive" />
+                                                                        )}
+                                                                        <span className="text-muted-foreground">{claim.claim}</span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+
+                                                    {c.is_noncommittal ? (
+                                                        <div className="text-xs text-amber-600">
+                                                            裁判判定這是迴避性回答,Answer Relevancy 直接記 0。
+                                                        </div>
+                                                    ) : (
+                                                        c.relevancy_questions.length > 0 && (
+                                                            <div>
+                                                                <div className="mb-1 text-xs font-medium text-muted-foreground">
+                                                                    裁判反推的問題(用來跟原問題做 embedding 相似度比對)
+                                                                </div>
+                                                                <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+                                                                    {c.relevancy_questions.map((q, j) => (
+                                                                        <li key={j}>- {q}</li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                        )
+                                                    )}
+                                                </div>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    ))}
+                                </Accordion>
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
+            </div>
         </div>
     );
 }
