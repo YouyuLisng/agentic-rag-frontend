@@ -15,6 +15,11 @@ export type AgentEvent =
 
 export type AgentImpl = "handrolled" | "langchain";
 
+export interface HistoryMessage {
+    role: "user" | "assistant";
+    text: string;
+}
+
 export interface UploadedDocument {
     document_id: string;
     filename: string;
@@ -43,13 +48,14 @@ export async function streamChat(
     message: string,
     impl: AgentImpl,
     documentId: string | null,
+    history: HistoryMessage[],
     onEvent: (event: AgentEvent) => void,
     signal?: AbortSignal
 ): Promise<void> {
     const res = await fetch(`${API_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, impl, document_id: documentId }),
+        body: JSON.stringify({ message, impl, document_id: documentId, history }),
         signal,
     });
 

@@ -17,6 +17,7 @@ import {
     uploadDocument,
     type AgentEvent,
     type AgentImpl,
+    type HistoryMessage,
     type UploadedDocument,
 } from "@/lib/chat";
 import { cn } from "@/lib/utils";
@@ -161,14 +162,30 @@ export default function Home() {
         }
     }
 
-    function runOne(message: string, whichImpl: AgentImpl, setTurns: typeof setHandrolledTurns) {
+    // The backend keeps no session -- conversational continuity only
+    // exists if we resend prior turns ourselves. Only settled turns with
+    // final text qualify (a still-pending or mid-stream turn has none).
+    function buildHistory(turns: ConversationTurn[]): HistoryMessage[] {
+        return turns
+            .filter((t): t is ConversationTurn & { text: string } => !!t.text)
+            .map((t) => ({ role: t.role, text: t.text }));
+    }
+
+    function runOne(
+        message: string,
+        whichImpl: AgentImpl,
+        priorTurns: ConversationTurn[],
+        setTurns: typeof setHandrolledTurns
+    ) {
+        const history = buildHistory(priorTurns);
+
         setTurns((prev) => [
             ...prev,
             { role: "user", text: message },
             { role: "assistant", steps: [], pending: true, impl: whichImpl },
         ]);
 
-        return streamChat(message, whichImpl, uploadedDoc?.document_id ?? null, (event) => {
+        return streamChat(message, whichImpl, uploadedDoc?.document_id ?? null, history, (event) => {
             setTurns((prev) => updateLastAssistantTurn(prev, event));
             scrollToBottom();
         }).catch((e) => {
@@ -186,13 +203,15 @@ export default function Home() {
         // In compare mode, one question fires to both implementations at
         // once -- that's the whole point (seeing the difference without
         // having to re-ask). Otherwise it goes to whichever impl is
-        // selected.
+        // selected. Each track replays its own turn history, not the
+        // other implementation's -- they're independent conversations
+        // that happen to share the same questions.
         const tasks: Promise<void>[] = [];
         if (compareMode || impl === "handrolled") {
-            tasks.push(runOne(message, "handrolled", setHandrolledTurns));
+            tasks.push(runOne(message, "handrolled", handrolledTurns, setHandrolledTurns));
         }
         if (compareMode || impl === "langchain") {
-            tasks.push(runOne(message, "langchain", setLangchainTurns));
+            tasks.push(runOne(message, "langchain", langchainTurns, setLangchainTurns));
         }
 
         try {
