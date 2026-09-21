@@ -8,7 +8,14 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { fetchGenerationEval, fetchRetrievalEval, type EvalReport, type GenerationEvalReport } from "@/lib/eval";
+import {
+    fetchGenerationEval,
+    fetchRetrievalEval,
+    fetchToolSelectionEval,
+    type EvalReport,
+    type GenerationEvalReport,
+    type ToolSelectionReport,
+} from "@/lib/eval";
 import { cn } from "@/lib/utils";
 
 function MetricCard({ label, value }: { label: string; value: string }) {
@@ -55,6 +62,10 @@ export default function EvalPage() {
     const [genLoading, setGenLoading] = useState(false);
     const [genError, setGenError] = useState<string | null>(null);
 
+    const [toolReport, setToolReport] = useState<ToolSelectionReport | null>(null);
+    const [toolLoading, setToolLoading] = useState(false);
+    const [toolError, setToolError] = useState<string | null>(null);
+
     // Only ever called from the button's onClick, never from an effect --
     // unlike retrieval eval, generation eval is far more expensive (a full
     // agent turn plus two judge calls per case) so it must not auto-run.
@@ -65,6 +76,17 @@ export default function EvalPage() {
             .then(setGenReport)
             .catch((e) => setGenError(e instanceof Error ? e.message : String(e)))
             .finally(() => setGenLoading(false));
+    }, []);
+
+    // Same reasoning as generation eval: a full agent turn per case, so
+    // manually triggered only.
+    const runToolSelectionEval = useCallback(() => {
+        setToolLoading(true);
+        setToolError(null);
+        fetchToolSelectionEval()
+            .then(setToolReport)
+            .catch((e) => setToolError(e instanceof Error ? e.message : String(e)))
+            .finally(() => setToolLoading(false));
     }, []);
 
     // Pure fetch, no upfront setState -- safe to call directly from the
@@ -274,6 +296,88 @@ export default function EvalPage() {
                                         </AccordionItem>
                                     ))}
                                 </Accordion>
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
+            </div>
+
+            <div className="mt-10 border-t pt-6">
+                <div className="mb-1 flex items-center justify-between">
+                    <h2 className="text-base font-semibold">工具選對率評估(Tool Selection Accuracy)</h2>
+                    <Button variant="outline" size="sm" onClick={runToolSelectionEval} disabled={toolLoading}>
+                        {toolLoading ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                            <RotateCcw className="h-3.5 w-3.5" />
+                        )}
+                        {toolReport ? "重新評估" : "開始評估"}
+                    </Button>
+                </div>
+                <p className="mb-4 text-sm text-muted-foreground">
+                    19 題人工標註問題(單一意圖、複合意圖、不需要工具的寒暄、邊界案例),檢查 agent
+                    有沒有呼叫正確的工具組合——這是 Faithfulness/Answer Relevancy 看不到的錯誤類型:選錯工具、
+                    漏呼叫工具、或多呼叫了不必要的工具。同樣會產生真實 API 費用,需手動觸發。
+                </p>
+
+                {toolError && <div className="mb-4 text-sm text-destructive">評估失敗:{toolError}</div>}
+
+                {toolLoading && !toolReport && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> 評估中(19 題,每題都要跑完整對話)...
+                    </div>
+                )}
+
+                {toolReport && (
+                    <>
+                        <div className="mb-6 grid grid-cols-3 gap-3">
+                            <MetricCard
+                                label="Exact Match"
+                                value={`${(toolReport.metrics.exact_match_accuracy * 100).toFixed(1)}%`}
+                            />
+                            <MetricCard label="平均 Precision" value={toolReport.metrics.avg_precision.toFixed(3)} />
+                            <MetricCard label="平均 Recall" value={toolReport.metrics.avg_recall.toFixed(3)} />
+                        </div>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">逐題結果({toolReport.metrics.n} 題)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-8"></TableHead>
+                                            <TableHead>問題</TableHead>
+                                            <TableHead>預期工具</TableHead>
+                                            <TableHead>實際工具</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {toolReport.cases.map((c, i) => (
+                                            <TableRow key={i}>
+                                                <TableCell>
+                                                    {c.exact_match ? (
+                                                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                                    ) : (
+                                                        <XCircle className="h-4 w-4 text-destructive" />
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="max-w-[240px] text-sm whitespace-normal">
+                                                    {c.query}
+                                                </TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">
+                                                    {c.expected_tools.length > 0 ? c.expected_tools.join(", ") : "(無)"}
+                                                </TableCell>
+                                                <TableCell
+                                                    className={cn("text-sm", !c.exact_match && "text-destructive")}
+                                                >
+                                                    {c.actual_tools.length > 0 ? c.actual_tools.join(", ") : "(無)"}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
                             </CardContent>
                         </Card>
                     </>

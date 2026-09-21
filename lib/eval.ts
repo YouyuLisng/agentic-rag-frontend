@@ -59,3 +59,30 @@ export async function fetchGenerationEval(): Promise<GenerationEvalReport> {
     if (!res.ok) throw new Error(`Failed to fetch generation eval report: ${res.status}`);
     return res.json();
 }
+
+export interface ToolSelectionCaseResult {
+    query: string;
+    expected_tools: string[];
+    actual_tools: string[];
+    exact_match: boolean;
+    precision: number;
+    recall: number;
+}
+
+export interface ToolSelectionMetrics {
+    n: number;
+    exact_match_accuracy: number;
+    avg_precision: number;
+    avg_recall: number;
+}
+
+export interface ToolSelectionReport {
+    metrics: ToolSelectionMetrics;
+    cases: ToolSelectionCaseResult[];
+}
+
+export async function fetchToolSelectionEval(): Promise<ToolSelectionReport> {
+    const res = await fetch(`${API_URL}/eval/tool-selection`);
+    if (!res.ok) throw new Error(`Failed to fetch tool-selection eval report: ${res.status}`);
+    return res.json();
+}
