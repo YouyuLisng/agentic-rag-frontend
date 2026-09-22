@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Agentic RAG Travel Assistant -- Frontend
 
-## Getting Started
+Next.js UI for the [agentic-rag-fastapi](https://github.com/YouyuLisng/agentic-rag-fastapi)
+backend: a chat interface that streams an agent's tool-use decisions
+live (not just the final answer), a side-by-side mode to compare the
+hand-rolled agent loop against the LangChain implementation on the
+same question, a `/data` page exposing the real seed data so a viewer
+can independently verify the chatbot's answers, and an `/eval`
+dashboard for the backend's three-layer eval framework (retrieval,
+generation, tool selection).
 
-First, run the development server:
+## Stack
+
+Next.js 16 (App Router, Turbopack), React 19, Tailwind v4, shadcn/ui
+(built on Base UI, not Radix -- prop APIs differ from the Radix-based
+shadcn docs). Talks to the backend over SSE for streamed chat, plain
+`fetch` for everything else.
+
+## Setup
 
 ```bash
+npm install
+cp .env.example .env.local   # NEXT_PUBLIC_API_URL, defaults to http://localhost:8000
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Requires the backend running separately (see that repo's README) --
+this project has no server-side logic of its own beyond what Next.js
+itself needs, everything real happens in the FastAPI backend.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Private deployment (Docker)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This repo has its own standalone `Dockerfile` (multi-stage, Next.js
+`output: "standalone"`) -- build and run it on its own:
 
-## Learn More
+```bash
+docker build -t agentic-rag-frontend --build-arg NEXT_PUBLIC_API_URL=http://localhost:8000 .
+docker run -p 3000:3000 agentic-rag-frontend
+```
 
-To learn more about Next.js, take a look at the following resources:
+`NEXT_PUBLIC_API_URL` is a **build** argument, not a runtime one --
+Next.js inlines `process.env.NEXT_PUBLIC_*` into the client-side
+bundle while compiling, so setting it only as a container environment
+variable at `docker run` time has no effect on the already-built
+bundle.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+For the full stack (this frontend + the backend + a self-hosted
+Postgres+pgvector, no external cloud dependency) via one
+`docker compose up`, see `docker-compose.yml` in the backend repo --
+it expects this repo cloned as a sibling directory
+(`../agentic-rag-frontend`).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project layout
 
-## Deploy on Vercel
+```
+app/
+  page.tsx        chat UI -- streams SSE, side-by-side compare mode
+  data/page.tsx    read-only view of the real seed data
+  eval/page.tsx    retrieval/generation/tool-selection eval dashboards
+components/
+  chat/            tool-call timeline, markdown rendering
+  ui/               shadcn/ui components (Base UI-based)
+lib/
+  chat.ts          SSE parsing, chat/document-upload API calls
+  data.ts          /tours, /policies fetchers
+  eval.ts          /eval/* fetchers
+Dockerfile
+.dockerignore
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Testing
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npm run typecheck
+npm run build
+```
