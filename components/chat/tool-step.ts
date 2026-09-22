@@ -1,3 +1,5 @@
+import type { SourceRef } from "@/lib/chat";
+
 export interface ToolStep {
     turn: number;
     toolUseId: string;
@@ -15,4 +17,5 @@ export interface ConversationTurn {
     pending?: boolean;
     impl?: "handrolled" | "langchain";
     answerModel?: string;
+    sources?: SourceRef[];
 }

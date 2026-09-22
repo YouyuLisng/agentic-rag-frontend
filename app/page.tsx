@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 
 import { Markdown } from "@/components/chat/markdown";
+import { SourceCitations } from "@/components/chat/source-citations";
 import { ToolStepTimeline } from "@/components/chat/tool-step-timeline";
 import type { ConversationTurn } from "@/components/chat/tool-step";
 import { Button } from "@/components/ui/button";
@@ -74,7 +75,7 @@ function updateLastAssistantTurn(prev: ConversationTurn[], event: AgentEvent): C
             };
             break;
         case "final_answer":
-            updated = { ...last, text: event.text, pending: false, answerModel: event.model };
+            updated = { ...last, text: event.text, pending: false, answerModel: event.model, sources: event.sources };
             break;
         case "refusal":
             updated = { ...last, text: `很抱歉,這個問題我無法回答。${event.explanation ?? ""}`, pending: false };
@@ -114,6 +115,7 @@ function ConversationList({ turns }: { turns: ConversationTurn[] }) {
                                     </div>
                                 )}
                                 <Markdown>{turn.text}</Markdown>
+                                {turn.sources && <SourceCitations sources={turn.sources} />}
                             </>
                         ) : (
                             turn.pending && (

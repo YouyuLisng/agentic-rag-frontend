@@ -1,3 +1,10 @@
+export interface SourceRef {
+    document_slug: string;
+    title: string;
+    content: string;
+    similarity: number;
+}
+
 export type AgentEvent =
     | {
           type: "tool_call";
@@ -8,7 +15,7 @@ export type AgentEvent =
           model: string;
       }
     | { type: "tool_result"; turn: number; tool_use_id: string; name: string; result: string; is_error: boolean }
-    | { type: "final_answer"; text: string; model: string }
+    | { type: "final_answer"; text: string; model: string; sources: SourceRef[] }
     | { type: "refusal"; category: string | null; explanation: string | null }
     | { type: "max_turns_exceeded"; text: string }
     | { type: "error"; message: string };
