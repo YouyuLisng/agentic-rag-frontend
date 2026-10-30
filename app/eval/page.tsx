@@ -204,22 +204,22 @@ export default function EvalPage() {
                     </Button>
                 </div>
                 <p className="mb-4 text-sm text-muted-foreground">
-                    8 題會實際跑一次完整 agent 對話,再用 Haiku 當裁判評分:Faithfulness 檢查回答有沒有幻覺(是否忠實於
-                    檢索到的資料),Answer Relevancy 檢查回答是否真的切題(把答案反推回問題,再用 embedding 比對語意相似度)。
-                    這裡會產生真實 API 費用,不會自動執行,需手動觸發。
+                    24 題(8 份政策文件 × 3 個角度)會實際跑一次完整 agent 對話,再用 Haiku 當裁判評分:Faithfulness
+                    檢查回答有沒有幻覺(是否忠實於檢索到的資料),Answer Relevancy 檢查回答是否真的切題(把答案反推回問題,
+                    再用 embedding 比對語意相似度)。這裡會產生真實 API 費用,不會自動執行,需手動觸發。
                 </p>
 
                 {genError && <div className="mb-4 text-sm text-destructive">評估失敗:{genError}</div>}
 
                 {genLoading && !genReport && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" /> 評估中(8 題,每題都要跑完整對話 + 裁判評分)...
+                        <Loader2 className="h-4 w-4 animate-spin" /> 評估中(24 題,每題都要跑完整對話 + 裁判評分)...
                     </div>
                 )}
 
                 {genReport && (
                     <>
-                        <div className="mb-6 grid grid-cols-2 gap-3">
+                        <div className="mb-2 grid grid-cols-3 gap-3">
                             <MetricCard
                                 label="平均 Faithfulness"
                                 value={genReport.metrics.avg_faithfulness.toFixed(3)}
@@ -228,7 +228,16 @@ export default function EvalPage() {
                                 label="平均 Answer Relevancy"
                                 value={genReport.metrics.avg_answer_relevancy.toFixed(3)}
                             />
+                            <MetricCard
+                                label="不相關基準線"
+                                value={genReport.metrics.avg_answer_relevancy_baseline.toFixed(3)}
+                            />
                         </div>
+                        <p className="mb-6 text-xs text-muted-foreground">
+                            基準線是把每題反推出的問題故意配對到「別題」的原始問題算相似度——中文短句的 embedding
+                            cosine similarity 就算語意完全無關也不會趨近 0,所以 Answer Relevancy
+                            要跟這條基準線比較差距,而不是直接拿來對照 0~1 的絕對分數。
+                        </p>
 
                         <Card>
                             <CardContent className="pt-6">

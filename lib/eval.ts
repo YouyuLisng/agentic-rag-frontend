@@ -47,6 +47,7 @@ export interface GenerationEvalMetrics {
     n: number;
     avg_faithfulness: number;
     avg_answer_relevancy: number;
+    avg_answer_relevancy_baseline: number;
 }
 
 export interface GenerationEvalReport {
